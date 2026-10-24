@@ -1,42 +1,4 @@
-sound.playPacDeath();
-            state.lives--;
-            updateHUDLives();
-
-            if (state.lives <= 0) {
-                triggerGameOver(false);
-            } else {
-                showBanner(`Ouch! Lives Remaining: ${state.lives}`);
-                const pacStart = gridToWorld(16, 9);
-                pacmanMesh.position.set(pacStart.x, 0.2, pacStart.z);
-                currentDir = { x: 0, z: 0 };
-                nextDir = { x: 0, z: 0 };
-            }
-        }
-
-        function levelCleared() {
-            showBanner("LEVEL CLEARED! RESPAWNING PELLETS");
-            setTimeout(() => {
-                spawnPellets();
-            }, 1500);
-        }
-
-        function triggerGameOver(win = false) {
-            state.isGameOver = true;
-            const modal = document.getElementById('gameover-modal');
-            const title = document.getElementById('gameover-title');
-            const scoreDisplay = document.getElementById('gameover-score');
-
-            title.innerText = win ? "VICTORY!" : "GAME OVER";
-            title.className = win ? "text-2xl md:text-3xl font-arcade text-emerald-400 tracking-wider" : "text-2xl md:text-3xl font-arcade text-red-500 tracking-wider";
-            scoreDisplay.innerText = String(state.score).padStart(6, '0');
-
-            modal.classList.remove('hidden');
-        }
-
-        function resetGame() {
-            state.score = 0;
-            state.lives = 3;
-            state.isGameOver = false;<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -1319,6 +1281,45 @@ sound.playPacDeath();
         }
 
         function handlePacmanDeath() {
+            sound.playPacDeath();
+            state.lives--;
+            updateHUDLives();
+
+            if (state.lives <= 0) {
+                triggerGameOver(false);
+            } else {
+                showBanner(`Ouch! Lives Remaining: ${state.lives}`);
+                const pacStart = gridToWorld(16, 9);
+                pacmanMesh.position.set(pacStart.x, 0.2, pacStart.z);
+                currentDir = { x: 0, z: 0 };
+                nextDir = { x: 0, z: 0 };
+            }
+        }
+
+        function levelCleared() {
+            showBanner("LEVEL CLEARED! RESPAWNING PELLETS");
+            setTimeout(() => {
+                spawnPellets();
+            }, 1500);
+        }
+
+        function triggerGameOver(win = false) {
+            state.isGameOver = true;
+            const modal = document.getElementById('gameover-modal');
+            const title = document.getElementById('gameover-title');
+            const scoreDisplay = document.getElementById('gameover-score');
+
+            title.innerText = win ? "VICTORY!" : "GAME OVER";
+            title.className = win ? "text-2xl md:text-3xl font-arcade text-emerald-400 tracking-wider" : "text-2xl md:text-3xl font-arcade text-red-500 tracking-wider";
+            scoreDisplay.innerText = String(state.score).padStart(6, '0');
+
+            modal.classList.remove('hidden');
+        }
+
+        function resetGame() {
+            state.score = 0;
+            state.lives = 3;
+            state.isGameOver = false;
             state.frightenedTimer = 0;
 
             updateHUDScore();

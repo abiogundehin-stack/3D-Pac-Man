@@ -1,0 +1,1605 @@
+sound.playPacDeath();
+            state.lives--;
+            updateHUDLives();
+
+            if (state.lives <= 0) {
+                triggerGameOver(false);
+            } else {
+                showBanner(`Ouch! Lives Remaining: ${state.lives}`);
+                const pacStart = gridToWorld(16, 9);
+                pacmanMesh.position.set(pacStart.x, 0.2, pacStart.z);
+                currentDir = { x: 0, z: 0 };
+                nextDir = { x: 0, z: 0 };
+            }
+        }
+
+        function levelCleared() {
+            showBanner("LEVEL CLEARED! RESPAWNING PELLETS");
+            setTimeout(() => {
+                spawnPellets();
+            }, 1500);
+        }
+
+        function triggerGameOver(win = false) {
+            state.isGameOver = true;
+            const modal = document.getElementById('gameover-modal');
+            const title = document.getElementById('gameover-title');
+            const scoreDisplay = document.getElementById('gameover-score');
+
+            title.innerText = win ? "VICTORY!" : "GAME OVER";
+            title.className = win ? "text-2xl md:text-3xl font-arcade text-emerald-400 tracking-wider" : "text-2xl md:text-3xl font-arcade text-red-500 tracking-wider";
+            scoreDisplay.innerText = String(state.score).padStart(6, '0');
+
+            modal.classList.remove('hidden');
+        }
+
+        function resetGame() {
+            state.score = 0;
+            state.lives = 3;
+            state.isGameOver = false;<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>3D Pac-Man Arcade - Admin & Owner Edition</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Font Inter / Press Start 2P for Arcade vibe -->
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #050508;
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .font-arcade {
+            font-family: 'Press Start 2P', cursive;
+        }
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+        /* Custom scrollbars for modal panels */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #3b82f6;
+            border-radius: 3px;
+        }
+        /* Glassmorphism panel effects */
+        .glass-panel {
+            background: rgba(10, 15, 30, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.7);
+        }
+        .neon-border-yellow {
+            box-shadow: 0 0 15px rgba(234, 179, 8, 0.4), inset 0 0 15px rgba(234, 179, 8, 0.2);
+            border: 1px solid #eab308;
+        }
+        .neon-border-blue {
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.4), inset 0 0 15px rgba(59, 130, 246, 0.2);
+            border: 1px solid #3b82f6;
+        }
+        .neon-border-pink {
+            box-shadow: 0 0 15px rgba(236, 72, 153, 0.4), inset 0 0 15px rgba(236, 72, 153, 0.2);
+            border: 1px solid #ec4899;
+        }
+        .neon-text-yellow {
+            text-shadow: 0 0 8px rgba(234, 179, 8, 0.8);
+        }
+        .neon-text-blue {
+            text-shadow: 0 0 8px rgba(59, 130, 246, 0.8);
+        }
+        /* Pulsing power pellet effect in HUD */
+        @keyframes pulse-glow {
+            0%, 100% { transform: scale(1); opacity: 0.9; }
+            50% { transform: scale(1.15); opacity: 1; filter: drop-shadow(0 0 10px #facc15); }
+        }
+        .pulse-pellet {
+            animation: pulse-glow 1.2s infinite ease-in-out;
+        }
+        @keyframes float-up {
+            0% { transform: translateY(0) scale(0.8); opacity: 1; }
+            100% { transform: translateY(-40px) scale(1.2); opacity: 0; }
+        }
+        .floating-emote-text {
+            animation: float-up 1.8s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="text-white select-none">
+
+    <!-- GAME CANVAS CONTAINER -->
+    <div id="canvas-container" class="absolute inset-0 z-0"></div>
+
+    <!-- HUD OVERLAY -->
+    <div id="hud" class="absolute inset-0 pointer-events-none z-10 flex flex-col justify-between p-4 md:p-6">
+        <!-- Top Bar: Scores, Lives, Level -->
+        <div class="flex justify-between items-start w-full gap-2">
+            <!-- Score & High Score -->
+            <div class="glass-panel rounded-xl p-3 md:p-4 pointer-events-auto flex items-center gap-4 border-l-4 border-l-yellow-400">
+                <div>
+                    <div class="text-xs text-gray-400 font-arcade uppercase tracking-wider">Score</div>
+                    <div id="hud-score" class="text-xl md:text-3xl font-arcade text-yellow-400 neon-text-yellow mt-1">000000</div>
+                </div>
+                <div class="border-r border-gray-700 h-10 my-auto"></div>
+                <div>
+                    <div class="text-xs text-gray-400 font-arcade uppercase tracking-wider">High Score</div>
+                    <div id="hud-highscore" class="text-lg md:text-2xl font-arcade text-gray-300 mt-1">000000</div>
+                </div>
+            </div>
+
+            <!-- Frightened Mode Indicator -->
+            <div id="hud-power-status" class="hidden glass-panel rounded-xl px-4 py-2 pointer-events-auto items-center gap-3 border border-blue-500 bg-blue-950/40">
+                <div class="w-4 h-4 rounded-full bg-blue-400 pulse-pellet"></div>
+                <div>
+                    <div class="text-xs font-arcade text-blue-300">FRIGHTENED MODE</div>
+                    <div id="hud-power-timer" class="text-sm font-arcade text-white">00s</div>
+                </div>
+            </div>
+
+            <!-- Lives & Controls Hints -->
+            <div class="glass-panel rounded-xl p-3 md:p-4 pointer-events-auto flex flex-col items-end gap-2 border-r-4 border-r-blue-500">
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-gray-400 font-arcade">LIVES:</span>
+                    <div id="hud-lives" class="flex items-center gap-1.5 text-yellow-400">
+                        <!-- Dynamic life icons will be injected -->
+                    </div>
+                </div>
+                <div class="text-[10px] text-gray-400 font-mono hidden md:block">
+                    Press <span class="text-yellow-400 font-bold">[A]</span> Admin | <span class="text-blue-400 font-bold">[O]</span> Owner | <span class="text-pink-400 font-bold">[E]</span> Emotes
+                </div>
+            </div>
+        </div>
+
+        <!-- Notification Message Banner -->
+        <div id="hud-banner" class="self-center glass-panel px-6 py-3 rounded-full border border-yellow-500/50 text-center opacity-0 transition-all duration-300 transform -translate-y-4">
+            <span id="hud-banner-text" class="font-arcade text-sm md:text-base text-yellow-300">GAME STARTED</span>
+        </div>
+
+        <!-- Bottom Controls & Quick Panel Triggers -->
+        <div class="flex justify-between items-end w-full">
+            <!-- Mobile D-Pad Control Toggle / Quick Info -->
+            <div class="pointer-events-auto flex gap-2 flex-wrap">
+                <button id="btn-admin-toggle" class="glass-panel hover:bg-yellow-500/20 text-yellow-400 border border-yellow-500/40 px-3 py-2 md:px-4 md:py-2.5 rounded-lg text-xs md:text-sm font-semibold flex items-center gap-2 transition-all active:scale-95">
+                    <i class="fa-solid fa-user-shield"></i>
+                    <span>Admin [A]</span>
+                </button>
+                <button id="btn-owner-toggle" class="glass-panel hover:bg-blue-500/20 text-blue-400 border border-blue-500/40 px-3 py-2 md:px-4 md:py-2.5 rounded-lg text-xs md:text-sm font-semibold flex items-center gap-2 transition-all active:scale-95">
+                    <i class="fa-solid fa-sliders"></i>
+                    <span>Owner [O]</span>
+                </button>
+                <button id="btn-emote-toggle" class="glass-panel hover:bg-pink-500/20 text-pink-400 border border-pink-500/40 px-3 py-2 md:px-4 md:py-2.5 rounded-lg text-xs md:text-sm font-semibold flex items-center gap-2 transition-all active:scale-95">
+                    <i class="fa-solid fa-icons"></i>
+                    <span>Emotes [E]</span>
+                </button>
+                <button id="btn-sound-toggle" class="glass-panel hover:bg-gray-700/50 text-gray-300 border border-gray-600/40 p-2 md:px-3 md:py-2.5 rounded-lg text-xs md:text-sm transition-all">
+                    <i id="sound-icon" class="fa-solid fa-volume-high"></i>
+                </button>
+            </div>
+
+            <!-- On-Screen Touch Controls (Visible on mobile or small screens) -->
+            <div id="touch-controls" class="pointer-events-auto grid grid-cols-3 gap-1 w-36 h-36 md:hidden opacity-80">
+                <div></div>
+                <button id="btn-up" class="glass-panel rounded-lg flex items-center justify-center text-xl text-yellow-400 active:bg-yellow-500/40"><i class="fa-solid fa-caret-up"></i></button>
+                <div></div>
+                <button id="btn-left" class="glass-panel rounded-lg flex items-center justify-center text-xl text-yellow-400 active:bg-yellow-500/40"><i class="fa-solid fa-caret-left"></i></button>
+                <button id="btn-down" class="glass-panel rounded-lg flex items-center justify-center text-xl text-yellow-400 active:bg-yellow-500/40"><i class="fa-solid fa-caret-down"></i></button>
+                <button id="btn-right" class="glass-panel rounded-lg flex items-center justify-center text-xl text-yellow-400 active:bg-yellow-500/40"><i class="fa-solid fa-caret-right"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- EMOTE WHEEL MODAL -->
+    <div id="emote-modal" class="hidden fixed inset-0 z-30 bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="glass-panel neon-border-pink rounded-2xl w-full max-w-md p-6 space-y-4 animate-fade-in">
+            <div class="flex justify-between items-center border-b border-pink-500/30 pb-3">
+                <div class="flex items-center gap-3">
+                    <i class="fa-solid fa-masks-theater text-pink-400 text-2xl"></i>
+                    <div>
+                        <h2 class="font-arcade text-pink-400 text-sm md:text-base">INFINITE EMOTE WHEEL</h2>
+                        <p id="emote-status-lbl" class="text-xs text-gray-400">Infinite Spam Status: <span class="text-emerald-400 font-bold">ACTIVE</span></p>
+                    </div>
+                </div>
+                <button id="close-emote" class="text-gray-400 hover:text-white text-2xl font-bold">&times;</button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 pt-2">
+                <button data-emote="dance" class="btn-trigger-emote bg-pink-500/20 hover:bg-pink-500/40 border border-pink-500/50 p-4 rounded-xl flex flex-col items-center gap-2 transition-all active:scale-95">
+                    <span class="text-3xl">💃</span>
+                    <span class="font-arcade text-xs text-pink-300">Disco Dance</span>
+                </button>
+                <button data-emote="taunt" class="btn-trigger-emote bg-yellow-500/20 hover:bg-yellow-500/40 border border-yellow-500/50 p-4 rounded-xl flex flex-col items-center gap-2 transition-all active:scale-95">
+                    <span class="text-3xl">😜</span>
+                    <span class="font-arcade text-xs text-yellow-300">Ghost Taunt</span>
+                </button>
+                <button data-emote="victory" class="btn-trigger-emote bg-emerald-500/20 hover:bg-emerald-500/40 border border-emerald-500/50 p-4 rounded-xl flex flex-col items-center gap-2 transition-all active:scale-95">
+                    <span class="text-3xl">👑</span>
+                    <span class="font-arcade text-xs text-emerald-300">Crown Victory</span>
+                </button>
+                <button data-emote="aura" class="btn-trigger-emote bg-purple-500/20 hover:bg-purple-500/40 border border-purple-500/50 p-4 rounded-xl flex flex-col items-center gap-2 transition-all active:scale-95">
+                    <span class="text-3xl">🔥</span>
+                    <span class="font-arcade text-xs text-purple-300">Super Saiyan Aura</span>
+                </button>
+            </div>
+            
+            <div class="text-center pt-2">
+                <span class="text-xs text-gray-400 font-mono">Tip: Press <span class="text-pink-400">[E]</span> anytime in game to spam infinite emotes!</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ADMIN PANEL MODAL -->
+    <div id="admin-modal" class="hidden fixed inset-0 z-30 bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="glass-panel neon-border-yellow rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden animate-fade-in">
+            <!-- Modal Header -->
+            <div class="p-4 border-b border-yellow-500/30 flex justify-between items-center bg-yellow-950/20">
+                <div class="flex items-center gap-3">
+                    <i class="fa-solid fa-user-shield text-yellow-400 text-xl"></i>
+                    <div>
+                        <h2 class="font-arcade text-yellow-400 text-sm md:text-base">ADMIN COMMAND PANEL</h2>
+                        <p class="text-xs text-gray-400">Cheats, Infinite Emotes & Entity Spawning</p>
+                    </div>
+                </div>
+                <button id="close-admin" class="text-gray-400 hover:text-white p-2 text-xl font-bold">&times;</button>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="p-5 space-y-4 overflow-y-auto text-sm">
+                <!-- God Mode Toggle -->
+                <div class="flex items-center justify-between p-3 rounded-xl bg-gray-900/60 border border-gray-800">
+                    <div>
+                        <div class="font-semibold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-shield-halved text-yellow-400"></i> Infinite Health (God Mode)
+                        </div>
+                        <div class="text-xs text-gray-400">Pac-Man becomes immune to ghost attacks</div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="cheat-godmode" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-yellow-500"></div>
+                    </label>
+                </div>
+
+                <!-- Infinite Emotes Toggle -->
+                <div class="flex items-center justify-between p-3 rounded-xl bg-gray-900/60 border border-gray-800">
+                    <div>
+                        <div class="font-semibold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-infinity text-pink-400"></i> Infinite Emote Mode
+                        </div>
+                        <div class="text-xs text-gray-400">Remove cooldowns & enable continuous emote particle trails</div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="cheat-infinite-emotes" class="sr-only peer" checked>
+                        <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-pink-500"></div>
+                    </label>
+                </div>
+
+                <!-- Speed Boost Toggle -->
+                <div class="flex items-center justify-between p-3 rounded-xl bg-gray-900/60 border border-gray-800">
+                    <div>
+                        <div class="font-semibold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-bolt text-amber-400"></i> Hyper Speed Boost
+                        </div>
+                        <div class="text-xs text-gray-400">Double Pac-Man speed instantly</div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="cheat-speedboost" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                    </label>
+                </div>
+
+                <!-- Noclip Toggle -->
+                <div class="flex items-center justify-between p-3 rounded-xl bg-gray-900/60 border border-gray-800">
+                    <div>
+                        <div class="font-semibold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-ghost text-purple-400"></i> Noclip / Ghost Mode
+                        </div>
+                        <div class="text-xs text-gray-400">Pass freely through maze walls</div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="cheat-noclip" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
+                    </label>
+                </div>
+
+                <!-- Spawners Section -->
+                <div class="p-3 rounded-xl bg-gray-900/60 border border-gray-800 space-y-3">
+                    <div class="font-semibold text-yellow-400 flex items-center gap-2">
+                        <i class="fa-solid fa-cubes text-yellow-400"></i> Entity Spawners
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button id="btn-spawn-power" class="bg-yellow-500/20 hover:bg-yellow-500/40 text-yellow-300 border border-yellow-500/50 py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all">
+                            <i class="fa-solid fa-circle-dot"></i> Spawn Power Gumball
+                        </button>
+                        <button id="btn-force-frightened" class="bg-blue-500/20 hover:bg-blue-500/40 text-blue-300 border border-blue-500/50 py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all">
+                            <i class="fa-solid fa-bolt"></i> Force Eat Mode
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Ghost Controls -->
+                <div class="p-3 rounded-xl bg-gray-900/60 border border-gray-800 space-y-3">
+                    <div class="font-semibold text-red-400 flex items-center gap-2">
+                        <i class="fa-solid fa-ghost"></i> Ghost Manipulator
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button id="btn-freeze-ghosts" class="bg-indigo-500/20 hover:bg-indigo-500/40 text-indigo-300 border border-indigo-500/50 py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all">
+                            <i class="fa-solid fa-snowflake"></i> Freeze/Unfreeze
+                        </button>
+                        <button id="btn-spawn-ghost" class="bg-purple-500/20 hover:bg-purple-500/40 text-purple-300 border border-purple-500/50 py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all">
+                            <i class="fa-solid fa-plus"></i> Spawn Extra Ghost
+                        </button>
+                    </div>
+                    <button id="btn-kill-ghosts" class="w-full bg-red-500/20 hover:bg-red-500/40 text-red-300 border border-red-500/50 py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all">
+                        <i class="fa-solid fa-skull"></i> Despawn / Reset Ghosts
+                    </button>
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-gray-800 bg-gray-950/40 text-right">
+                <button id="btn-close-admin-footer" class="bg-gray-800 hover:bg-gray-700 text-gray-200 px-4 py-2 rounded-lg text-xs font-bold">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- OWNER PANEL MODAL (Live Game Customizer) -->
+    <div id="owner-modal" class="hidden fixed inset-0 z-30 bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="glass-panel neon-border-blue rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden animate-fade-in">
+            <!-- Modal Header -->
+            <div class="p-4 border-b border-blue-500/30 flex justify-between items-center bg-blue-950/20">
+                <div class="flex items-center gap-3">
+                    <i class="fa-solid fa-sliders text-blue-400 text-xl"></i>
+                    <div>
+                        <h2 class="font-arcade text-blue-400 text-sm md:text-base">OWNER GAME EDITOR</h2>
+                        <p class="text-xs text-gray-400">Live Engine Tweaks, Visuals & Mechanics</p>
+                    </div>
+                </div>
+                <button id="close-owner" class="text-gray-400 hover:text-white p-2 text-xl font-bold">&times;</button>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="p-5 space-y-4 overflow-y-auto text-sm">
+                <!-- Theme / Material Style -->
+                <div class="p-3 rounded-xl bg-gray-900/60 border border-gray-800 space-y-2">
+                    <label class="block font-semibold text-blue-300">Maze Wall Theme & Color</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <select id="opt-wall-style" class="bg-gray-800 border border-gray-700 text-white text-xs rounded-lg p-2.5 focus:border-blue-500 outline-none">
+                            <option value="neon">Neon Cyberpunk</option>
+                            <option value="arcade">Classic Blue Arcade</option>
+                            <option value="scifi">Sci-Fi Glowing Red</option>
+                            <option value="emerald">Matrix Emerald</option>
+                            <option value="gold">Gold Luxury</option>
+                        </select>
+                        <input type="color" id="opt-wall-color" value="#3b82f6" class="h-9 w-full bg-gray-800 border border-gray-700 rounded-lg p-1 cursor-pointer">
+                    </div>
+                </div>
+
+                <!-- Camera Angle Selection -->
+                <div class="p-3 rounded-xl bg-gray-900/60 border border-gray-800 space-y-2">
+                    <label class="block font-semibold text-blue-300">Camera View Angle</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button data-cam="iso" class="btn-cam bg-blue-600/40 text-blue-200 border border-blue-500/50 py-2 rounded-lg text-xs font-semibold">Isometric 3D</button>
+                        <button data-cam="top" class="btn-cam bg-gray-800 hover:bg-gray-700 text-gray-300 py-2 rounded-lg text-xs font-semibold">Top Down</button>
+                        <button data-cam="follow" class="btn-cam bg-gray-800 hover:bg-gray-700 text-gray-300 py-2 rounded-lg text-xs font-semibold">3rd Person</button>
+                    </div>
+                </div>
+
+                <!-- Sliders: Speed, Scale, Lighting & Fog -->
+                <div class="p-3 rounded-xl bg-gray-900/60 border border-gray-800 space-y-3">
+                    <div>
+                        <div class="flex justify-between text-xs font-semibold text-gray-300 mb-1">
+                            <span>Pac-Man Size Scale</span>
+                            <span id="lbl-pac-scale">1.0x</span>
+                        </div>
+                        <input type="range" id="slider-pac-scale" min="0.5" max="2.2" step="0.1" value="1.0" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-xs font-semibold text-gray-300 mb-1">
+                            <span>Power Pellet Duration</span>
+                            <span id="lbl-power-dur">8s</span>
+                        </div>
+                        <input type="range" id="slider-power-dur" min="3" max="25" step="1" value="8" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-xs font-semibold text-gray-300 mb-1">
+                            <span>Pac-Man Speed Factor</span>
+                            <span id="lbl-pac-speed">1.0x</span>
+                        </div>
+                        <input type="range" id="slider-pac-speed" min="0.5" max="3.0" step="0.1" value="1.0" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-xs font-semibold text-gray-300 mb-1">
+                            <span>Ghost Movement Speed</span>
+                            <span id="lbl-ghost-speed">1.0x</span>
+                        </div>
+                        <input type="range" id="slider-ghost-speed" min="0.3" max="2.5" step="0.1" value="1.0" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-xs font-semibold text-gray-300 mb-1">
+                            <span>Pellet Point Multiplier</span>
+                            <span id="lbl-point-mult">1x</span>
+                        </div>
+                        <input type="range" id="slider-point-mult" min="1" max="10" step="1" value="1" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-xs font-semibold text-gray-300 mb-1">
+                            <span>Light Intensity / Fog Density</span>
+                            <span id="lbl-fog-density">Normal</span>
+                        </div>
+                        <input type="range" id="slider-fog-density" min="0" max="0.04" step="0.005" value="0.015" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                    </div>
+                </div>
+
+                <!-- Game Level Controls -->
+                <div class="p-3 rounded-xl bg-gray-900/60 border border-gray-800 space-y-2">
+                    <label class="block font-semibold text-blue-300">Level & Maze Quick Actions</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button id="btn-clear-pellets" class="bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-300 border border-emerald-500/50 py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-trophy"></i> Auto-Win Level
+                        </button>
+                        <button id="btn-reset-pellets" class="bg-gray-700 hover:bg-gray-600 text-gray-200 py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-rotate-right"></i> Respawn Pellets
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-gray-800 bg-gray-950/40 text-right">
+                <button id="btn-close-owner-footer" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded-lg text-xs font-bold">Apply & Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- GAME OVER / WIN MODAL OVERLAY -->
+    <div id="gameover-modal" class="hidden fixed inset-0 z-40 bg-black/80 backdrop-blur-lg flex items-center justify-center p-4">
+        <div class="glass-panel border-2 border-yellow-500/80 rounded-3xl p-8 max-w-sm w-full text-center space-y-6 animate-bounce-in">
+            <h1 id="gameover-title" class="text-2xl md:text-3xl font-arcade text-red-500 tracking-wider">GAME OVER</h1>
+            
+            <div class="space-y-2">
+                <p class="text-xs text-gray-400 font-arcade">FINAL SCORE</p>
+                <div id="gameover-score" class="text-3xl font-arcade text-yellow-400 neon-text-yellow">000000</div>
+            </div>
+
+            <button id="btn-restart" class="w-full bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 text-black font-arcade text-sm py-4 rounded-xl shadow-lg shadow-yellow-500/30 transition-all transform hover:scale-105 active:scale-95">
+                PLAY AGAIN
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN GAME LOGIC & THREE.JS ENGINE SCRIPT -->
+    <script>
+        // --- 1. PROCEDURAL SOUND SYNTHESIZER (WEB AUDIO API) ---
+        class SoundEngine {
+            constructor() {
+                this.ctx = null;
+                this.enabled = true;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (AudioCtx) this.ctx = new AudioCtx();
+                }
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            playPelletChomp() {
+                if (!this.enabled) return;
+                this.init();
+                if (!this.ctx) return;
+
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(320, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(600, this.ctx.currentTime + 0.05);
+
+                gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.05);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.05);
+            }
+
+            playPowerPellet() {
+                if (!this.enabled) return;
+                this.init();
+                if (!this.ctx) return;
+
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(400, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(800, this.ctx.currentTime + 0.2);
+
+                gain.gain.setValueAtTime(0.25, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.2);
+            }
+
+            playEatGhost() {
+                if (!this.enabled) return;
+                this.init();
+                if (!this.ctx) return;
+
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(200, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(800, this.ctx.currentTime + 0.3);
+
+                gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.3);
+            }
+
+            playEmoteSound() {
+                if (!this.enabled) return;
+                this.init();
+                if (!this.ctx) return;
+
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, this.ctx.currentTime); // C5
+                osc.frequency.setValueAtTime(659.25, this.ctx.currentTime + 0.08); // E5
+                osc.frequency.setValueAtTime(783.99, this.ctx.currentTime + 0.16); // G5
+
+                gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.25);
+            }
+
+            playPacDeath() {
+                if (!this.enabled) return;
+                this.init();
+                if (!this.ctx) return;
+
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(500, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(80, this.ctx.currentTime + 0.6);
+
+                gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.6);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.6);
+            }
+        }
+
+        const sound = new SoundEngine();
+
+        // --- 2. GAME MAP & CONSTANTS ---
+        // 1 = Wall, 0 = Pellet, 2 = Power Pellet, 3 = Empty space / Ghost House
+        const MAZE_GRID = [
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,2,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,2,1],
+            [1,0,1,1,0,1,1,1,0,1,0,1,1,1,0,1,1,0,1],
+            [1,0,1,1,0,1,1,1,0,1,0,1,1,1,0,1,1,0,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,0,1,1,0,1,0,1,1,1,1,1,0,1,0,1,1,0,1],
+            [1,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,1],
+            [1,1,1,1,0,1,1,1,3,1,3,1,1,1,0,1,1,1,1],
+            [3,3,3,1,0,1,3,3,3,3,3,3,3,1,0,1,3,3,3],
+            [1,1,1,1,0,1,3,1,1,3,1,1,3,1,0,1,1,1,1],
+            [3,3,3,3,0,3,3,1,3,3,3,1,3,3,0,3,3,3,3],
+            [1,1,1,1,0,1,3,1,1,1,1,1,3,1,0,1,1,1,1],
+            [3,3,3,1,0,1,3,3,3,3,3,3,3,1,0,1,3,3,3],
+            [1,1,1,1,0,1,3,1,1,1,1,1,3,1,0,1,1,1,1],
+            [1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1],
+            [1,0,1,1,0,1,1,1,0,1,0,1,1,1,0,1,1,0,1],
+            [1,2,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,2,1],
+            [1,1,0,1,0,1,0,1,1,1,1,1,0,1,0,1,0,1,1],
+            [1,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,1],
+            [1,0,1,1,1,1,1,1,0,1,0,1,1,1,1,1,1,0,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+        ];
+
+        const GRID_ROWS = MAZE_GRID.length;
+        const GRID_COLS = MAZE_GRID[0].length;
+        const CELL_SIZE = 2; // 3D units per grid square
+
+        // Ghost Config
+        const GHOST_SPECS = [
+            { name: 'Blinky', color: 0xff0000, startGrid: { r: 9, c: 9 } },
+            { name: 'Pinky', color: 0xffb8ff, startGrid: { r: 10, c: 8 } },
+            { name: 'Inky', color: 0x00ffff, startGrid: { r: 10, c: 10 } },
+            { name: 'Clyde', color: 0xffb852, startGrid: { r: 9, c: 8 } }
+        ];
+
+        // --- 3. STATE & CONFIG DATA ---
+        const state = {
+            score: 0,
+            highScore: localStorage.getItem('pacman_3d_highscore') || 0,
+            lives: 3,
+            frightenedTimer: 0,
+            frightenedDuration: 8.0, // seconds
+            isGameOver: false,
+            godMode: false,
+            noclip: false,
+            speedBoost: false,
+            infiniteEmotes: true,
+            ghostsFrozen: false,
+            pacSpeedMult: 1.0,
+            pacScale: 1.0,
+            ghostSpeedMult: 1.0,
+            pointMult: 1,
+            cameraMode: 'iso', // iso, top, follow
+            totalPellets: 0,
+            eatenPellets: 0,
+            wallTheme: 'neon',
+            wallColor: '#3b82f6',
+            activeEmote: null,
+            emoteTimer: 0
+        };
+
+        // World Coordinates conversion
+        function gridToWorld(r, c) {
+            const x = (c - (GRID_COLS - 1) / 2) * CELL_SIZE;
+            const z = (r - (GRID_ROWS - 1) / 2) * CELL_SIZE;
+            return { x, z };
+        }
+
+        function worldToGrid(x, z) {
+            const c = Math.round(x / CELL_SIZE + (GRID_COLS - 1) / 2);
+            const r = Math.round(z / CELL_SIZE + (GRID_ROWS - 1) / 2);
+            return { r, c };
+        }
+
+        // --- 4. THREE.JS ENGINE SETUP ---
+        let scene, camera, renderer;
+        let pacmanMesh, pacmanMouthUpper, pacmanMouthLower, emoteAuraRing;
+        let ghostObjects = [];
+        let pelletMeshes = [];
+        let wallMeshes = [];
+        let mazeFloorMesh;
+        let particleSystem;
+
+        // Input tracking
+        const keys = {};
+        let currentDir = { x: 0, z: 0 };
+        let nextDir = { x: 0, z: 0 };
+
+        function initEngine() {
+            const container = document.getElementById('canvas-container');
+
+            // Scene setup
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x050508);
+            scene.fog = new THREE.FogExp2(0x050508, 0.015);
+
+            // Camera setup
+            camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+            updateCameraPosition();
+
+            // Renderer setup
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(20, 40, 20);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 1024;
+            dirLight.shadow.mapSize.height = 1024;
+            scene.add(dirLight);
+
+            // Build Game World
+            buildMazeFloor();
+            buildMazeWalls();
+            spawnPellets();
+            createPacman();
+            spawnGhosts();
+            initEmoteParticleSystem();
+
+            // Event Listeners
+            window.addEventListener('resize', onWindowResize);
+            window.addEventListener('keydown', (e) => {
+                keys[e.key.toLowerCase()] = true;
+                handleKeyDown(e);
+            });
+            window.addEventListener('keyup', (e) => {
+                keys[e.key.toLowerCase()] = false;
+            });
+
+            // Touch Control Setup
+            setupTouchControls();
+
+            // UI Init
+            updateHUDScore();
+            updateHUDLives();
+        }
+
+        // --- 5. MESH BUILDERS ---
+
+        function buildMazeFloor() {
+            const width = GRID_COLS * CELL_SIZE;
+            const height = GRID_ROWS * CELL_SIZE;
+            const geo = new THREE.PlaneGeometry(width, height);
+            
+            const mat = new THREE.MeshStandardMaterial({
+                color: 0x0d1117,
+                roughness: 0.8,
+                metalness: 0.2
+            });
+            mazeFloorMesh = new THREE.Mesh(geo, mat);
+            mazeFloorMesh.rotation.x = -Math.PI / 2;
+            mazeFloorMesh.position.set(0, -0.5, 0);
+            mazeFloorMesh.receiveShadow = true;
+            scene.add(mazeFloorMesh);
+
+            const gridHelper = new THREE.GridHelper(Math.max(width, height), 25, 0x1e293b, 0x0f172a);
+            gridHelper.position.y = -0.48;
+            scene.add(gridHelper);
+        }
+
+        function buildMazeWalls() {
+            wallMeshes.forEach(w => scene.remove(w));
+            wallMeshes = [];
+
+            const wallGeo = new THREE.BoxGeometry(CELL_SIZE, 1.2, CELL_SIZE);
+            
+            let wallMat;
+            if (state.wallTheme === 'neon') {
+                wallMat = new THREE.MeshStandardMaterial({
+                    color: new THREE.Color(state.wallColor),
+                    emissive: new THREE.Color(state.wallColor),
+                    emissiveIntensity: 0.3,
+                    roughness: 0.3,
+                    metalness: 0.5
+                });
+            } else if (state.wallTheme === 'scifi') {
+                wallMat = new THREE.MeshStandardMaterial({
+                    color: 0x222222,
+                    emissive: new THREE.Color(state.wallColor),
+                    emissiveIntensity: 0.6,
+                    wireframe: true
+                });
+            } else {
+                wallMat = new THREE.MeshStandardMaterial({
+                    color: new THREE.Color(state.wallColor),
+                    roughness: 0.4,
+                    metalness: 0.6
+                });
+            }
+
+            for (let r = 0; r < GRID_ROWS; r++) {
+                for (let c = 0; c < GRID_COLS; c++) {
+                    if (MAZE_GRID[r][c] === 1) {
+                        const wall = new THREE.Mesh(wallGeo, wallMat);
+                        const pos = gridToWorld(r, c);
+                        wall.position.set(pos.x, 0.1, pos.z);
+                        wall.castShadow = true;
+                        wall.receiveShadow = true;
+                        scene.add(wall);
+                        wallMeshes.push(wall);
+                    }
+                }
+            }
+        }
+
+        function spawnPellets() {
+            pelletMeshes.forEach(p => scene.remove(p.mesh));
+            pelletMeshes = [];
+            state.totalPellets = 0;
+            state.eatenPellets = 0;
+
+            const pelletGeo = new THREE.SphereGeometry(0.2, 12, 12);
+            const powerGeo = new THREE.SphereGeometry(0.45, 16, 16);
+
+            const pelletMat = new THREE.MeshStandardMaterial({
+                color: 0xffea00,
+                emissive: 0xffa000,
+                emissiveIntensity: 0.6
+            });
+
+            const powerMat = new THREE.MeshStandardMaterial({
+                color: 0x00ffff,
+                emissive: 0x00bfff,
+                emissiveIntensity: 1.0
+            });
+
+            for (let r = 0; r < GRID_ROWS; r++) {
+                for (let c = 0; c < GRID_COLS; c++) {
+                    const val = MAZE_GRID[r][c];
+                    if (val === 0 || val === 2) {
+                        const isPower = (val === 2);
+                        const mesh = new THREE.Mesh(isPower ? powerGeo : pelletGeo, isPower ? powerMat : pelletMat);
+                        const pos = gridToWorld(r, c);
+                        mesh.position.set(pos.x, 0, pos.z);
+
+                        if (isPower) {
+                            const pLight = new THREE.PointLight(0x00ffff, 0.8, 3);
+                            mesh.add(pLight);
+                        }
+
+                        scene.add(mesh);
+                        pelletMeshes.push({
+                            mesh: mesh,
+                            gridR: r,
+                            gridC: c,
+                            isPower: isPower,
+                            active: true
+                        });
+                        state.totalPellets++;
+                    }
+                }
+            }
+        }
+
+        function createPacman() {
+            if (pacmanMesh) scene.remove(pacmanMesh);
+
+            const pacGroup = new THREE.Group();
+
+            const mat = new THREE.MeshStandardMaterial({
+                color: 0xffd700,
+                roughness: 0.2,
+                metalness: 0.1,
+                emissive: 0xffa500,
+                emissiveIntensity: 0.2
+            });
+
+            const upperGeo = new THREE.SphereGeometry(0.75, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+            const lowerGeo = new THREE.SphereGeometry(0.75, 32, 16, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2);
+
+            pacmanMouthUpper = new THREE.Mesh(upperGeo, mat);
+            pacmanMouthLower = new THREE.Mesh(lowerGeo, mat);
+
+            const eyeGeo = new THREE.SphereGeometry(0.1, 8, 8);
+            const eyeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+            
+            const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+            leftEye.position.set(0.35, 0.35, 0.55);
+            const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+            rightEye.position.set(-0.35, 0.35, 0.55);
+
+            pacmanMouthUpper.add(leftEye);
+            pacmanMouthUpper.add(rightEye);
+
+            pacGroup.add(pacmanMouthUpper);
+            pacGroup.add(pacmanMouthLower);
+
+            // Emote Aura Ring Graphic
+            const ringGeo = new THREE.RingGeometry(0.8, 1.2, 32);
+            const ringMat = new THREE.MeshBasicMaterial({ color: 0xec4899, side: THREE.DoubleSide, transparent: true, opacity: 0 });
+            emoteAuraRing = new THREE.Mesh(ringGeo, ringMat);
+            emoteAuraRing.rotation.x = Math.PI / 2;
+            emoteAuraRing.position.y = -0.4;
+            pacGroup.add(emoteAuraRing);
+
+            const pacLight = new THREE.PointLight(0xffd700, 1.2, 5);
+            pacGroup.add(pacLight);
+
+            const startPos = gridToWorld(16, 9);
+            pacGroup.position.set(startPos.x, 0.2, startPos.z);
+            pacGroup.scale.set(state.pacScale, state.pacScale, state.pacScale);
+            scene.add(pacGroup);
+
+            pacmanMesh = pacGroup;
+        }
+
+        function spawnGhosts() {
+            ghostObjects.forEach(g => scene.remove(g.mesh));
+            ghostObjects = [];
+
+            GHOST_SPECS.forEach((spec) => {
+                createGhostEntity(spec.name, spec.color, spec.startGrid.r, spec.startGrid.c);
+            });
+        }
+
+        function createGhostEntity(name, colorHex, r, c) {
+            const ghostGroup = new THREE.Group();
+
+            const headGeo = new THREE.SphereGeometry(0.65, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+            const mat = new THREE.MeshStandardMaterial({
+                color: colorHex,
+                roughness: 0.3,
+                metalness: 0.1
+            });
+            const head = new THREE.Mesh(headGeo, mat);
+            head.position.y = 0.2;
+            ghostGroup.add(head);
+
+            const bodyGeo = new THREE.CylinderGeometry(0.65, 0.65, 0.5, 24);
+            const body = new THREE.Mesh(bodyGeo, mat);
+            body.position.y = -0.05;
+            ghostGroup.add(body);
+
+            const eyeGeo = new THREE.SphereGeometry(0.16, 12, 12);
+            const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            const pupilGeo = new THREE.SphereGeometry(0.08, 8, 8);
+            const pupilMat = new THREE.MeshBasicMaterial({ color: 0x0000ff });
+
+            const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
+            eyeL.position.set(-0.25, 0.25, 0.52);
+            const pupilL = new THREE.Mesh(pupilGeo, pupilMat);
+            pupilL.position.set(0, 0, 0.08);
+            eyeL.add(pupilL);
+
+            const eyeR = new THREE.Mesh(eyeGeo, eyeMat);
+            eyeR.position.set(0.25, 0.25, 0.52);
+            const pupilR = new THREE.Mesh(pupilGeo, pupilMat);
+            pupilR.position.set(0, 0, 0.08);
+            eyeR.add(pupilR);
+
+            ghostGroup.add(eyeL);
+            ghostGroup.add(eyeR);
+
+            const pos = gridToWorld(r, c);
+            ghostGroup.position.set(pos.x, 0.2, pos.z);
+
+            scene.add(ghostGroup);
+
+            ghostObjects.push({
+                name: name,
+                baseColor: colorHex,
+                mesh: ghostGroup,
+                material: mat,
+                dir: { x: 0, z: 0 }
+            });
+        }
+
+        // Particle System for Emotes
+        function initEmoteParticleSystem() {
+            const particleCount = 60;
+            const geo = new THREE.BufferGeometry();
+            const positions = new Float32Array(particleCount * 3);
+
+            for (let i = 0; i < particleCount * 3; i++) {
+                positions[i] = 0;
+            }
+
+            geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+            const mat = new THREE.PointsMaterial({
+                color: 0xec4899,
+                size: 0.35,
+                transparent: true,
+                opacity: 0
+            });
+
+            particleSystem = new THREE.Points(geo, mat);
+            scene.add(particleSystem);
+        }
+
+        function triggerEmote(type) {
+            state.activeEmote = type;
+            state.emoteTimer = state.infiniteEmotes ? 9999 : 2.5;
+            sound.playEmoteSound();
+
+            const textMap = {
+                'dance': '💃 DISCO DANCE!',
+                'taunt': '😜 CAN\'T CATCH ME!',
+                'victory': '👑 PAC-KING!',
+                'aura': '🔥 SUPER SAIYAN!'
+            };
+
+            showFloatingEmoteText(textMap[type] || 'EMOTE!');
+            showBanner(`EMOTE PLAYED: ${type.toUpperCase()}`);
+        }
+
+        function showFloatingEmoteText(str) {
+            const el = document.createElement('div');
+            el.className = 'fixed font-arcade text-pink-400 text-lg md:text-2xl font-bold floating-emote-text pointer-events-none z-50 neon-text-pink';
+            el.innerText = str;
+            el.style.left = '50%';
+            el.style.top = '45%';
+            el.style.transform = 'translate(-50%, -50%)';
+            document.body.appendChild(el);
+
+            setTimeout(() => el.remove(), 1800);
+        }
+
+        // --- 6. CONTROLS & CAMERA UPDATES ---
+
+        function updateCameraPosition() {
+            if (!camera) return;
+
+            if (state.cameraMode === 'iso') {
+                camera.position.set(0, 32, 28);
+                camera.lookAt(0, -2, 0);
+            } else if (state.cameraMode === 'top') {
+                camera.position.set(0, 42, 0.1);
+                camera.lookAt(0, 0, 0);
+            } else if (state.cameraMode === 'follow') {
+                if (pacmanMesh) {
+                    camera.position.set(pacmanMesh.position.x, 12, pacmanMesh.position.z + 14);
+                    camera.lookAt(pacmanMesh.position.x, 0, pacmanMesh.position.z);
+                }
+            }
+        }
+
+        function handleKeyDown(e) {
+            const k = e.key.toLowerCase();
+            if (k === 'w' || k === 'arrowup') setNextDirection(0, -1);
+            if (k === 's' || k === 'arrowdown') setNextDirection(0, 1);
+            if (k === 'a' && !keys['control']) toggleAdminModal();
+            else if (k === 'a' || k === 'arrowleft') setNextDirection(-1, 0);
+            if (k === 'd' || k === 'arrowright') setNextDirection(1, 0);
+            if (k === 'o') toggleOwnerModal();
+            if (k === 'e') toggleEmoteModal();
+        }
+
+        function setNextDirection(x, z) {
+            nextDir = { x, z };
+        }
+
+        function setupTouchControls() {
+            document.getElementById('btn-up').addEventListener('click', () => setNextDirection(0, -1));
+            document.getElementById('btn-down').addEventListener('click', () => setNextDirection(0, 1));
+            document.getElementById('btn-left').addEventListener('click', () => setNextDirection(-1, 0));
+            document.getElementById('btn-right').addEventListener('click', () => setNextDirection(1, 0));
+        }
+
+        // --- 7. GAMEPLAY LOGIC & MOVEMENT ---
+
+        function isWall(r, c) {
+            if (state.noclip) return false;
+            if (r < 0 || r >= GRID_ROWS || c < 0 || c >= GRID_COLS) return true;
+            return MAZE_GRID[r][c] === 1;
+        }
+
+        function updatePacman(delta) {
+            if (!pacmanMesh || state.isGameOver) return;
+
+            let effectiveSpeed = 7.0 * state.pacSpeedMult;
+            if (state.speedBoost) effectiveSpeed *= 2.0;
+
+            const pos = pacmanMesh.position;
+
+            // Mouth animation
+            const time = clock.getElapsedTime() * 12 * state.pacSpeedMult;
+            const mouthAngle = (Math.sin(time) + 1) * 0.25;
+            if (pacmanMouthUpper && pacmanMouthLower) {
+                pacmanMouthUpper.rotation.x = mouthAngle;
+                pacmanMouthLower.rotation.x = -mouthAngle;
+            }
+
+            // Emote Animations
+            if (state.activeEmote) {
+                if (state.activeEmote === 'dance') {
+                    pacmanMesh.rotation.y += delta * 10;
+                    pacmanMesh.position.y = 0.2 + Math.abs(Math.sin(time * 2)) * 0.5;
+                } else if (state.activeEmote === 'taunt') {
+                    pacmanMesh.rotation.z = Math.sin(time * 3) * 0.4;
+                } else if (state.activeEmote === 'victory') {
+                    pacmanMesh.position.y = 0.2 + Math.abs(Math.sin(time * 3)) * 0.8;
+                } else if (state.activeEmote === 'aura') {
+                    emoteAuraRing.material.opacity = 0.8;
+                    emoteAuraRing.scale.setScalar(1 + Math.sin(time * 4) * 0.3);
+                }
+
+                // Update particle trails
+                if (particleSystem) {
+                    particleSystem.material.opacity = 0.8;
+                    const positions = particleSystem.geometry.attributes.position.array;
+                    for (let i = 0; i < positions.length; i += 3) {
+                        positions[i] = pos.x + (Math.random() - 0.5) * 1.5;
+                        positions[i + 1] = pos.y + (Math.random() - 0.5) * 1.5;
+                        positions[i + 2] = pos.z + (Math.random() - 0.5) * 1.5;
+                    }
+                    particleSystem.geometry.attributes.position.needsUpdate = true;
+                }
+
+                if (!state.infiniteEmotes) {
+                    state.emoteTimer -= delta;
+                    if (state.emoteTimer <= 0) {
+                        state.activeEmote = null;
+                        emoteAuraRing.material.opacity = 0;
+                        particleSystem.material.opacity = 0;
+                        pacmanMesh.position.y = 0.2;
+                        pacmanMesh.rotation.z = 0;
+                    }
+                }
+            }
+
+            // Check grid alignment
+            const curGrid = worldToGrid(pos.x, pos.z);
+            const gridCenter = gridToWorld(curGrid.r, curGrid.c);
+            const distToCenter = Math.hypot(pos.x - gridCenter.x, pos.z - gridCenter.z);
+
+            if (distToCenter < 0.15) {
+                if (nextDir.x !== 0 || nextDir.z !== 0) {
+                    const targetR = curGrid.r + nextDir.z;
+                    const targetC = curGrid.c + nextDir.x;
+                    if (!isWall(targetR, targetC)) {
+                        currentDir = { ...nextDir };
+                    }
+                }
+
+                const nextR = curGrid.r + currentDir.z;
+                const nextC = curGrid.c + currentDir.x;
+                if (isWall(nextR, nextC)) {
+                    currentDir = { x: 0, z: 0 };
+                    pos.x = gridCenter.x;
+                    pos.z = gridCenter.z;
+                }
+            }
+
+            // Move Pacman
+            pos.x += currentDir.x * effectiveSpeed * delta;
+            pos.z += currentDir.z * effectiveSpeed * delta;
+
+            if (currentDir.x !== 0 || currentDir.z !== 0) {
+                const angle = Math.atan2(currentDir.x, currentDir.z);
+                pacmanMesh.rotation.y = angle;
+            }
+
+            // Screen Wrapping
+            if (pos.x > (GRID_COLS * CELL_SIZE) / 2) pos.x = -(GRID_COLS * CELL_SIZE) / 2;
+            if (pos.x < -(GRID_COLS * CELL_SIZE) / 2) pos.x = (GRID_COLS * CELL_SIZE) / 2;
+
+            checkPelletCollision(pos);
+
+            if (state.cameraMode === 'follow') {
+                updateCameraPosition();
+            }
+        }
+
+        function checkPelletCollision(pacPos) {
+            pelletMeshes.forEach(p => {
+                if (!p.active) return;
+                const dist = pacPos.distanceTo(p.mesh.position);
+                if (dist < 0.8) {
+                    p.active = false;
+                    p.mesh.visible = false;
+                    state.eatenPellets++;
+
+                    if (p.isPower) {
+                        triggerFrightenedMode();
+                        addScore(50 * state.pointMult);
+                        sound.playPowerPellet();
+                        showBanner("POWER GUMBALL EATEN!");
+                    } else {
+                        addScore(10 * state.pointMult);
+                        sound.playPelletChomp();
+                    }
+
+                    if (state.eatenPellets >= state.totalPellets) {
+                        levelCleared();
+                    }
+                }
+            });
+        }
+
+        function triggerFrightenedMode() {
+            state.frightenedTimer = state.frightenedDuration;
+            const hudPower = document.getElementById('hud-power-status');
+            hudPower.classList.remove('hidden');
+            hudPower.classList.add('flex');
+
+            ghostObjects.forEach(g => {
+                g.material.color.setHex(0x0000ff);
+            });
+        }
+
+        function updateFrightenedTimer(delta) {
+            if (state.frightenedTimer > 0) {
+                state.frightenedTimer -= delta;
+                document.getElementById('hud-power-timer').innerText = `${Math.ceil(state.frightenedTimer)}s`;
+
+                if (state.frightenedTimer <= 0) {
+                    const hudPower = document.getElementById('hud-power-status');
+                    hudPower.classList.add('hidden');
+                    hudPower.classList.remove('flex');
+
+                    ghostObjects.forEach(g => {
+                        g.material.color.setHex(g.baseColor);
+                    });
+                }
+            }
+        }
+
+        function updateGhosts(delta) {
+            if (state.ghostsFrozen || state.isGameOver) return;
+
+            const speed = (state.frightenedTimer > 0 ? 3.0 : 5.5) * state.ghostSpeedMult;
+
+            ghostObjects.forEach(ghost => {
+                const pos = ghost.mesh.position;
+                const curGrid = worldToGrid(pos.x, pos.z);
+                const gridCenter = gridToWorld(curGrid.r, curGrid.c);
+                const dist = Math.hypot(pos.x - gridCenter.x, pos.z - gridCenter.z);
+
+                if (dist < 0.15) {
+                    const validDirs = [];
+                    const possibleDirs = [
+                        { x: 0, z: -1 },
+                        { x: 0, z: 1 },
+                        { x: -1, z: 0 },
+                        { x: 1, z: 0 }
+                    ];
+
+                    possibleDirs.forEach(d => {
+                        if (d.x === -ghost.dir.x && d.z === -ghost.dir.z) return;
+                        if (!isWall(curGrid.r + d.z, curGrid.c + d.x)) {
+                            validDirs.push(d);
+                        }
+                    });
+
+                    if (validDirs.length === 0) {
+                        validDirs.push({ x: -ghost.dir.x, z: -ghost.dir.z });
+                    }
+
+                    if (state.frightenedTimer > 0) {
+                        ghost.dir = validDirs[Math.floor(Math.random() * validDirs.length)];
+                    } else {
+                        let bestDir = validDirs[0];
+                        let minDist = Infinity;
+                        validDirs.forEach(d => {
+                            const targetR = curGrid.r + d.z;
+                            const targetC = curGrid.c + d.x;
+                            const targetPos = gridToWorld(targetR, targetC);
+                            const dToPac = Math.hypot(targetPos.x - pacmanMesh.position.x, targetPos.z - pacmanMesh.position.z);
+                            if (dToPac < minDist) {
+                                minDist = dToPac;
+                                bestDir = d;
+                            }
+                        });
+                        ghost.dir = bestDir || validDirs[0];
+                    }
+                }
+
+                pos.x += ghost.dir.x * speed * delta;
+                pos.z += ghost.dir.z * speed * delta;
+
+                const pacDist = pos.distanceTo(pacmanMesh.position);
+                if (pacDist < 0.9) {
+                    if (state.frightenedTimer > 0) {
+                        addScore(200 * state.pointMult);
+                        sound.playEatGhost();
+                        showBanner(`ATE ${ghost.name.toUpperCase()}! +200`);
+
+                        const start = gridToWorld(10, 9);
+                        pos.set(start.x, 0.2, start.z);
+                    } else if (!state.godMode) {
+                        handlePacmanDeath();
+                    }
+                }
+            });
+        }
+
+        function handlePacmanDeath() {
+            state.frightenedTimer = 0;
+
+            updateHUDScore();
+            updateHUDLives();
+
+            document.getElementById('gameover-modal').classList.add('hidden');
+
+            const pacStart = gridToWorld(16, 9);
+            pacmanMesh.position.set(pacStart.x, 0.2, pacStart.z);
+            currentDir = { x: 0, z: 0 };
+            nextDir = { x: 0, z: 0 };
+
+            spawnPellets();
+            spawnGhosts();
+            showBanner("NEW GAME STARTED!");
+        }
+
+        function addScore(pts) {
+            state.score += pts;
+            if (state.score > state.highScore) {
+                state.highScore = state.score;
+                localStorage.setItem('pacman_3d_highscore', state.highScore);
+            }
+            updateHUDScore();
+        }
+
+        // --- 8. HUD & UI UPDATES ---
+
+        function updateHUDScore() {
+            document.getElementById('hud-score').innerText = String(state.score).padStart(6, '0');
+            document.getElementById('hud-highscore').innerText = String(state.highScore).padStart(6, '0');
+        }
+
+        function updateHUDLives() {
+            const container = document.getElementById('hud-lives');
+            container.innerHTML = '';
+            for (let i = 0; i < state.lives; i++) {
+                const icon = document.createElement('i');
+                icon.className = 'fa-solid fa-ghost text-yellow-400 text-sm md:text-base';
+                container.appendChild(icon);
+            }
+            if (state.godMode) {
+                const godLabel = document.createElement('span');
+                godLabel.className = 'text-xs font-arcade text-yellow-300 ml-1';
+                godLabel.innerText = '(GOD)';
+                container.appendChild(godLabel);
+            }
+        }
+
+        function showBanner(text) {
+            const banner = document.getElementById('hud-banner');
+            const bannerText = document.getElementById('hud-banner-text');
+            bannerText.innerText = text;
+
+            banner.classList.remove('opacity-0', '-translate-y-4');
+            banner.classList.add('opacity-100', 'translate-y-0');
+
+            clearTimeout(window.bannerTimeout);
+            window.bannerTimeout = setTimeout(() => {
+                banner.classList.remove('opacity-100', 'translate-y-0');
+                banner.classList.add('opacity-0', '-translate-y-4');
+            }, 2500);
+        }
+
+        // --- 9. ADMIN & OWNER PANEL LOGIC ---
+
+        function toggleAdminModal() {
+            document.getElementById('admin-modal').classList.toggle('hidden');
+        }
+
+        function toggleOwnerModal() {
+            document.getElementById('owner-modal').classList.toggle('hidden');
+        }
+
+        function toggleEmoteModal() {
+            document.getElementById('emote-modal').classList.toggle('hidden');
+        }
+
+        function setupPanels() {
+            // Emote Wheel Buttons
+            document.getElementById('btn-emote-toggle').addEventListener('click', toggleEmoteModal);
+            document.getElementById('close-emote').addEventListener('click', toggleEmoteModal);
+
+            document.querySelectorAll('.btn-trigger-emote').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const emote = btn.getAttribute('data-emote');
+                    triggerEmote(emote);
+                });
+            });
+
+            // Admin Actions
+            document.getElementById('btn-admin-toggle').addEventListener('click', toggleAdminModal);
+            document.getElementById('close-admin').addEventListener('click', toggleAdminModal);
+            document.getElementById('btn-close-admin-footer').addEventListener('click', toggleAdminModal);
+
+            document.getElementById('cheat-godmode').addEventListener('change', (e) => {
+                state.godMode = e.target.checked;
+                updateHUDLives();
+                showBanner(state.godMode ? "GOD MODE ENABLED!" : "GOD MODE DISABLED");
+            });
+
+            document.getElementById('cheat-infinite-emotes').addEventListener('change', (e) => {
+                state.infiniteEmotes = e.target.checked;
+                document.getElementById('emote-status-lbl').innerHTML = `Infinite Spam Status: <span class="${state.infiniteEmotes ? 'text-emerald-400' : 'text-red-400'} font-bold">${state.infiniteEmotes ? 'ACTIVE' : 'OFF'}</span>`;
+                showBanner(state.infiniteEmotes ? "INFINITE EMOTE SPAM ENABLED!" : "INFINITE EMOTE SPAM DISABLED");
+            });
+
+            document.getElementById('cheat-speedboost').addEventListener('change', (e) => {
+                state.speedBoost = e.target.checked;
+                showBanner(state.speedBoost ? "SPEED BOOST ENABLED!" : "SPEED BOOST DISABLED");
+            });
+
+            document.getElementById('cheat-noclip').addEventListener('change', (e) => {
+                state.noclip = e.target.checked;
+                showBanner(state.noclip ? "NOCLIP ENABLED!" : "NOCLIP DISABLED");
+            });
+
+            document.getElementById('btn-spawn-power').addEventListener('click', () => {
+                const pacGrid = worldToGrid(pacmanMesh.position.x, pacmanMesh.position.z);
+                const pos = gridToWorld(pacGrid.r, pacGrid.c);
+
+                const powerGeo = new THREE.SphereGeometry(0.5, 16, 16);
+                const powerMat = new THREE.MeshStandardMaterial({ color: 0x00ffff, emissive: 0x00bfff, emissiveIntensity: 1.2 });
+                const mesh = new THREE.Mesh(powerGeo, powerMat);
+                mesh.position.set(pos.x, 0, pos.z);
+
+                scene.add(mesh);
+                pelletMeshes.push({
+                    mesh: mesh,
+                    gridR: pacGrid.r,
+                    gridC: pacGrid.c,
+                    isPower: true,
+                    active: true
+                });
+                showBanner("POWER GUMBALL SPAWNED!");
+            });
+
+            document.getElementById('btn-force-frightened').addEventListener('click', () => {
+                triggerFrightenedMode();
+                showBanner("FRIGHTENED MODE FORCED!");
+            });
+
+            document.getElementById('btn-freeze-ghosts').addEventListener('click', () => {
+                state.ghostsFrozen = !state.ghostsFrozen;
+                showBanner(state.ghostsFrozen ? "GHOSTS FROZEN!" : "GHOSTS UNFROZEN");
+            });
+
+            document.getElementById('btn-spawn-ghost').addEventListener('click', () => {
+                const randomColor = Math.floor(Math.random() * 0xffffff);
+                createGhostEntity("ExtraGhost", randomColor, 10, 9);
+                showBanner("EXTRA GHOST SPAWNED!");
+            });
+
+            document.getElementById('btn-kill-ghosts').addEventListener('click', () => {
+                ghostObjects.forEach(g => scene.remove(g.mesh));
+                ghostObjects = [];
+                showBanner("ALL GHOSTS DESPAWNED!");
+            });
+
+            // Owner Actions
+            document.getElementById('btn-owner-toggle').addEventListener('click', toggleOwnerModal);
+            document.getElementById('close-owner').addEventListener('click', toggleOwnerModal);
+            document.getElementById('btn-close-owner-footer').addEventListener('click', toggleOwnerModal);
+
+            document.getElementById('opt-wall-style').addEventListener('change', (e) => {
+                state.wallTheme = e.target.value;
+                buildMazeWalls();
+            });
+
+            document.getElementById('opt-wall-color').addEventListener('input', (e) => {
+                state.wallColor = e.target.value;
+                buildMazeWalls();
+            });
+
+            const camBtns = document.querySelectorAll('.btn-cam');
+            camBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    camBtns.forEach(b => {
+                        b.className = "btn-cam bg-gray-800 hover:bg-gray-700 text-gray-300 py-2 rounded-lg text-xs font-semibold";
+                    });
+                    btn.className = "btn-cam bg-blue-600/40 text-blue-200 border border-blue-500/50 py-2 rounded-lg text-xs font-semibold";
+                    state.cameraMode = btn.getAttribute('data-cam');
+                    updateCameraPosition();
+                });
+            });
+
+            // Sliders
+            document.getElementById('slider-pac-scale').addEventListener('input', (e) => {
+                state.pacScale = parseFloat(e.target.value);
+                document.getElementById('lbl-pac-scale').innerText = `${state.pacScale.toFixed(1)}x`;
+                if (pacmanMesh) {
+                    pacmanMesh.scale.set(state.pacScale, state.pacScale, state.pacScale);
+                }
+            });
+
+            document.getElementById('slider-power-dur').addEventListener('input', (e) => {
+                state.frightenedDuration = parseFloat(e.target.value);
+                document.getElementById('lbl-power-dur').innerText = `${state.frightenedDuration}s`;
+            });
+
+            document.getElementById('slider-pac-speed').addEventListener('input', (e) => {
+                state.pacSpeedMult = parseFloat(e.target.value);
+                document.getElementById('lbl-pac-speed').innerText = `${state.pacSpeedMult.toFixed(1)}x`;
+            });
+
+            document.getElementById('slider-ghost-speed').addEventListener('input', (e) => {
+                state.ghostSpeedMult = parseFloat(e.target.value);
+                document.getElementById('lbl-ghost-speed').innerText = `${state.ghostSpeedMult.toFixed(1)}x`;
+            });
+
+            document.getElementById('slider-point-mult').addEventListener('input', (e) => {
+                state.pointMult = parseInt(e.target.value);
+                document.getElementById('lbl-point-mult').innerText = `${state.pointMult}x`;
+            });
+
+            document.getElementById('slider-fog-density').addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                scene.fog.density = val;
+                document.getElementById('lbl-fog-density').innerText = val === 0 ? 'Off' : val < 0.02 ? 'Normal' : 'Thick';
+            });
+
+            document.getElementById('btn-clear-pellets').addEventListener('click', () => {
+                pelletMeshes.forEach(p => {
+                    p.active = false;
+                    p.mesh.visible = false;
+                });
+                levelCleared();
+                toggleOwnerModal();
+            });
+
+            document.getElementById('btn-reset-pellets').addEventListener('click', () => {
+                spawnPellets();
+                showBanner("PELLETS RESPAWNED!");
+            });
+
+            // Sound Toggle
+            document.getElementById('btn-sound-toggle').addEventListener('click', () => {
+                sound.enabled = !sound.enabled;
+                const icon = document.getElementById('sound-icon');
+                icon.className = sound.enabled ? 'fa-solid fa-volume-high' : 'fa-solid fa-volume-xmark text-red-400';
+            });
+
+            document.getElementById('btn-restart').addEventListener('click', resetGame);
+        }
+
+        // --- 10. RESIZE & MAIN RENDER LOOP ---
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const delta = clock.getDelta();
+
+            updatePacman(delta);
+            updateGhosts(delta);
+            updateFrightenedTimer(delta);
+
+            pelletMeshes.forEach(p => {
+                if (p.active && p.isPower) {
+                    p.mesh.rotation.y += delta * 2;
+                    const scale = 1 + Math.sin(clock.getElapsedTime() * 6) * 0.15;
+                    p.mesh.scale.set(scale, scale, scale);
+                }
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        window.onload = function() {
+            initEngine();
+            setupPanels();
+            animate();
+            showBanner("WELCOME TO 3D PAC-MAN!");
+        };
+    </script>
+</body>
+</html>
